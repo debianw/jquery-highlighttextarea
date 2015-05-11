@@ -1,10 +1,6 @@
 /*!
  * jQuery highlightTextarea
- * Original work Copyright 2014 Damien "Mistic" Sorel (http://www.strangeplanet.fr)
- *
- * Modified work Copyright 2015 Digital Cuisine (http://www.digitalcuisine.fr):
- *  - adding a class attribute to <mark> tags to facilitate styling (only for ranges)
- *
+ * Copyright 2014 Damien "Mistic" Sorel (http://www.strangeplanet.fr)
  * Licensed under MIT (http://opensource.org/licenses/MIT)
  */
 
@@ -23,10 +19,10 @@
         // build HTML
         this.$el = $el;
 
-        this.$el.wrap('<div class="highlightTextarea"></div>');
+        this.$el.wrap('<div class=highlightTextarea></div>');
         this.$main = this.$el.parent();
 
-        this.$main.prepend('<div class="highlightTextarea-container"><div class="highlightTextarea-highlighter"></div></div>');
+        this.$main.prepend('<div class=container><div class=highlighter></div></div>');
         this.$container = this.$main.children().first();
         this.$highlighter = this.$container.children();
 
@@ -53,10 +49,10 @@
         ranges: {},
         color: '#ffff00',
         caseSensitive: true,
-        wordsOnly: false,
         resizable: false,
         id: '',
-        debug: false
+        debug: false,
+        parentReference: null
     };
 
     // PUBLIC METHODS
@@ -67,14 +63,10 @@
     Highlighter.prototype.highlight = function() {
         var text = Utilities.htmlEntities(this.$el.val()),
             that = this;
-        	that.spacer = '';
-        	if (this.settings.wordsOnly ) {
-        		that.spacer = '\\b';
-        	}
-        	
+
         $.each(this.settings.words, function(color, words) {
             text = text.replace(
-                new RegExp(that.spacer+'('+ words.join('|') +')'+that.spacer, that.regParam),
+                new RegExp('('+ words.join('|') +')', that.regParam),
                 '<mark style="background-color:'+ color +';">$1</mark>'
             );
         });
@@ -82,15 +74,7 @@
         $.each(this.settings.ranges, function(i, range) {
             if (range.start < text.length) {
                 text = Utilities.strInsert(text, range.end, '</mark>');
-
-                var mark = '<mark style="background-color:'+ range.color +';"';
-                if (range.class != null)
-                {
-                    mark += 'class="' + range.class + '"';
-                }
-                mark += ">";
-
-                text = Utilities.strInsert(text, range.start, mark);
+                text = Utilities.strInsert(text, range.start, '<mark style="background-color:'+ range.color +';">');
             }
         });
 
@@ -201,15 +185,15 @@
 
         // add triggers to textarea
         this.$el.on({
-            'input.highlightTextarea': Utilities.throttle(function() {
+            'input.highlighter': Utilities.throttle(function() {
                 this.highlight();
             }, 100, this),
 
-            'resize.highlightTextarea': Utilities.throttle(function() {
+            'resize.highlighter': Utilities.throttle(function() {
                 this.updateSizePosition(true);
             }, 50, this),
 
-            'scroll.highlightTextarea select.highlightTextarea': Utilities.throttle(function() {
+            'scroll.highlighter select.highlighter': Utilities.throttle(function() {
                 this.updateSizePosition();
             }, 50, this)
         });
@@ -217,12 +201,12 @@
         if (this.isInput) {
             this.$el.on({
                 // Prevent Cmd-Left Arrow and Cmd-Right Arrow on Mac strange behavior
-                'keydown.highlightTextarea keypress.highlightTextarea keyup.highlightTextarea': function() {
+                'keydown.highlighter keypress.highlighter keyup.highlighter': function() {
                     setTimeout($.proxy(that.updateSizePosition, that), 1);
                 },
 
                 // Force Chrome behavior on all browsers: reset input position on blur
-                'blur.highlightTextarea': function() {
+                'blur.highlighter': function() {
                     this.value = this.value;
                     this.scrollLeft = 0;
                     that.updateSizePosition.call(that);
@@ -240,21 +224,25 @@
         }
         this.active = false;
 
-        this.$highlighter.off('.highlightTextarea');
-        this.$el.off('.highlightTextarea');
+        this.$highlighter.off('click.highlighter');
+        this.$el.off('input.highlighter resize.highlighter scroll.highlighter' +
+            ' keydown.highlighter keypress.highlighter keyup.highlighter' +
+            ' select.highlighter blur.highlighter');
     };
 
     /*
      * Update CSS of wrapper and containers
      */
     Highlighter.prototype.updateCss = function() {
+        //this.resetCss();
+
         // the main container has the same size and position than the original textarea
         Utilities.cloneCss(this.$el, this.$main, [
             'float','vertical-align'
         ]);
         this.$main.css({
-            'width':    this.$el.outerWidth(true),
-            'height': this.$el.outerHeight(true)
+            'width': this.settings.parentReference ? this.settings.parentReference.innerWidth() : this.$el.outerWidth(true),
+            'height': this.settings.parentReference ? this.settings.parentReference.innerHeight() : this.$el.outerHeight(true)
         });
 
         // the highlighter container is positionned at "real" top-left corner of the textarea and takes its background
@@ -266,8 +254,10 @@
         this.$container.css({
             'top':        Utilities.toPx(this.$el.css('margin-top')) + Utilities.toPx(this.$el.css('border-top-width')),
             'left':     Utilities.toPx(this.$el.css('margin-left')) + Utilities.toPx(this.$el.css('border-left-width')),
-            'width':    this.$el.width(),
-            'height': this.$el.height()
+            'width': this.settings.parentReference ? this.settings.parentReference.innerWidth() : this.$el.outerWidth(true),
+            'height': this.settings.parentReference ? this.settings.parentReference.innerHeight() : this.$el.outerHeight(true)
+            /*'width':    this.$el.width(),
+            'height': this.$el.height()*/
         });
 
         // the highlighter has the same size than the "inner" textarea and must have the same font properties
@@ -531,7 +521,6 @@
                         if ($.isArray(range.ranges[j])) {
                             out.push({
                                 color: range.color,
-                                class: range.class,
                                 start: range.ranges[j][0],
                                 end: range.ranges[j][1]
                             });
@@ -599,4 +588,4 @@
             }
         });
     };
-}(window.jQuery || window.Zepto));
+}(jQuery));
